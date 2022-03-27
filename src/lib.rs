@@ -4,9 +4,9 @@ extern crate diesel;
 extern crate serde_derive;
 
 mod errors;
-// mod models;
-// mod routes;
-// mod schema;
+mod models;
+mod routes;
+mod schema;
 
 use actix_web::{middleware, App, HttpServer};
 use diesel::prelude::*;
@@ -24,20 +24,20 @@ impl Blog {
   }
 
   pub fn run(&self, database_url: String) -> std::io::Result<()> {
-    let manager = ConnectionManager::<SqliteConnection>::new(database_url);
+    let manager = r2d2::ConnectionManager::<SqliteConnection>::new(database_url);
     let pool = r2d2::Pool::builder()
       .build(manager)
       .expect("Failed to create pool");
 
-    println!("Starting http server: 127.0.0.1:{}", self.port);
-
+    println!("Starting server on 127.0.0.1:{}", self.port);
     HttpServer::new(move || {
       App::new()
         .data(pool.clone())
         .wrap(middleware::Logger::default())
-      // .configure(routes::users::configure)
+        .configure(routes::users::configure)
     })
     .bind(("127.0.0.1", self.port))?
+    .workers(2)
     .run()
   }
 }

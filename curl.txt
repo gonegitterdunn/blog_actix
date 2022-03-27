@@ -1,0 +1,7 @@
+curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/users -d '{"username":"Frank"}'
+
+curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/users -d '{"username":"Bob"}'
+
+curl -s -H 'Content-Type: application/json' -X GET http://localhost:8998/users/find/Frank
+
+curl -s -H 'Content-Type: application/json' -X GET http://localhost:8998/users/1

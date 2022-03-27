@@ -6,6 +6,9 @@ use diesel::result::{
 };
 use std::fmt::{Display, Formatter, Result};
 
+// 1 - make enum
+// 2 - impl Display
+
 #[derive(Debug)]
 pub enum AppError {
   RecordAlreadyExists,
@@ -17,27 +20,27 @@ pub enum AppError {
 impl Display for AppError {
   fn fmt(&self, f: &mut Formatter) -> Result {
     match self {
-      AppError::RecordAlreadyExists => write!(f, "This record violates a unique constraint"),
-      AppError::RecordNotFound => write!(f, "This record does not exist"),
-      AppError::DatabaseError(e) => write!(f, "Database error: {:?}", e),
-      AppError::OperationCanceled => write!(f, "The running operation was canceled"),
+      AppError::RecordAlreadyExists => write!(f, "Record violates unique constraint"),
+      AppError::RecordNotFound => write!(f, "Record does not exist"),
+      AppError::DatabaseError(e) => write!(f, "Database error: {}", e),
+      AppError::OperationCanceled => write!(f, "Operation was canceled"),
     }
   }
 }
 
 impl From<diesel::result::Error> for AppError {
-  fn from(e: diesel::result::Error) -> Self {
-    match e {
+  fn from(err: diesel::result::Error) -> Self {
+    match err {
       DatabaseError(UniqueViolation, _) => AppError::RecordAlreadyExists,
       NotFound => AppError::RecordNotFound,
-      _ => AppError::DatabaseError(e),
+      _ => AppError::DatabaseError(err),
     }
   }
 }
 
 impl From<BlockingError<AppError>> for AppError {
-  fn from(e: BlockingError<AppError>) -> Self {
-    match e {
+  fn from(err: BlockingError<AppError>) -> Self {
+    match err {
       BlockingError::Error(inner) => inner,
       BlockingError::Canceled => AppError::OperationCanceled,
     }
