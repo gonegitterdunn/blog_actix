@@ -1,5 +1,5 @@
 use crate::errors::AppError;
-use crate::schema::{posts, users};
+use crate::schema::{comments, posts, users};
 use diesel::prelude::*;
 
 type Result<T> = std::result::Result<T, AppError>;
@@ -17,6 +17,23 @@ pub struct Post {
   pub user_id: i32,
   pub title: String,
   pub body: String,
+  pub published: bool,
+}
+
+#[derive(Debug, Serialize, Identifiable, Queryable, Associations)]
+#[belongs_to(User)]
+#[belongs_to(Post)]
+pub struct Comment {
+  pub id: i32,
+  pub user_id: i32,
+  pub post_id: i32,
+  pub body: String,
+}
+
+#[derive(Debug, Serialize, Queryable)]
+pub struct PostWithComment {
+  pub id: i32,
+  pub title: String,
   pub published: bool,
 }
 
@@ -72,35 +89,105 @@ pub fn create_post(conn: &SqliteConnection, user: &User, title: &str, body: &str
   })
 }
 
-pub fn publish_post(conn: &SqliteConnection, post_id: i32) -> Result<Post> {
+pub fn publish_post(conn: &SqliteConnection, user_id: i32) -> Result<Post> {
   conn.transaction(|| {
-    diesel::update(posts::table.filter(posts::id.eq(post_id)))
+    diesel::update(posts::table.filter(posts::id.eq(user_id)))
       .set(posts::published.eq(true))
       .execute(conn)?;
 
     posts::table
-      .find(post_id)
+      .find(posts::id)
       .select(posts::all_columns)
       .first(conn)
       .map_err(Into::into)
   })
 }
 
-pub fn all_posts(conn: &SqliteConnection) -> Result<Vec<(Post, User)>> {
-  posts::table
+pub fn fetch_all_posts(
+  conn: &SqliteConnection,
+) -> Result<Vec<((Post, User), Vec<(Comment, User)>)>> {
+  let query = posts::table
     .order(posts::id.desc())
     .filter(posts::published.eq(true))
     .inner_join(users::table)
-    .select((posts::all_columns, (users::id, users::username)))
-    .load::<(Post, User)>(conn)
-    .map_err(Into::into)
+    .select((posts::all_columns, (users::id, users::username)));
+
+  // vector of tuples
+  let post_with_users = query.load::<(Post, User)>(conn)?;
+  // tuple of vectors
+  let (posts, post_users): (Vec<_>, Vec<_>) = post_with_users.into_iter().unzip();
+
+  let comments = Comment::belonging_to(&posts)
+    .inner_join(users::table)
+    .select((comments::all_columns, (users::id, users::username)))
+    .load::<(Comment, User)>(conn)?
+    .grouped_by(&posts); // associates comments indexed by posts -- Vector wrapper
+
+  Ok(posts.into_iter().zip(post_users).zip(comments).collect())
 }
 
-pub fn user_posts(conn: &SqliteConnection, user_id: i32) -> Result<Vec<Post>> {
-  posts::table
+pub fn fetch_user_posts(
+  conn: &SqliteConnection,
+  user_id: i32,
+) -> Result<Vec<(Post, Vec<(Comment, User)>)>> {
+  let posts = posts::table
     .filter(posts::user_id.eq(user_id))
     .order(posts::id.desc())
     .select(posts::all_columns)
-    .load::<Post>(conn)
+    .load::<Post>(conn)?;
+
+  let comments = Comment::belonging_to(&posts)
+    .inner_join(users::table)
+    .select((comments::all_columns, (users::id, users::username)))
+    .load::<(Comment, User)>(conn)?
+    .grouped_by(&posts);
+
+  Ok(posts.into_iter().zip(comments).collect())
+}
+
+pub fn create_comment(
+  conn: &SqliteConnection,
+  user_id: i32,
+  post_id: i32,
+  body: &str,
+) -> Result<Comment> {
+  conn.transaction(|| {
+    diesel::insert_into(comments::table)
+      .values((
+        comments::user_id.eq(user_id),
+        comments::post_id.eq(post_id),
+        comments::body.eq(body),
+      ))
+      .execute(conn)?;
+
+    comments::table
+      .order(comments::id.desc())
+      .select(comments::all_columns)
+      .first(conn)
+      .map_err(Into::into)
+  })
+}
+
+pub fn fetch_post_comments(conn: &SqliteConnection, post_id: i32) -> Result<Vec<(Comment, User)>> {
+  comments::table
+    .filter(comments::post_id.eq(post_id))
+    .inner_join(users::table)
+    .select((comments::all_columns, (users::id, users::username)))
+    .load::<(Comment, User)>(conn)
+    .map_err(Into::into)
+}
+
+pub fn fetch_user_comments(
+  conn: &SqliteConnection,
+  user_id: i32,
+) -> Result<Vec<(Comment, PostWithComment)>> {
+  comments::table
+    .filter(comments::user_id.eq(user_id))
+    .inner_join(posts::table)
+    .select((
+      comments::all_columns,
+      (posts::id, posts::title, posts::published),
+    ))
+    .load::<(Comment, PostWithComment)>(conn)
     .map_err(Into::into)
 }
