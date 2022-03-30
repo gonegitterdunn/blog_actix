@@ -4,6 +4,12 @@ use diesel::prelude::*;
 
 type Result<T> = std::result::Result<T, AppError>;
 
+type PostWithAuthor = (Post, User);
+type CommentWithUser = (Comment, User);
+type CommentsWithUsers = Vec<CommentWithUser>;
+
+// type Result<UserPosts> = Result<Vec<(Post, CommentsWithUsers)>>;
+
 #[derive(Queryable, Identifiable, Serialize, Debug, PartialEq)]
 pub struct User {
   pub id: i32,
@@ -56,7 +62,7 @@ pub enum UserKey<'a> {
   ID(i32),
 }
 
-pub fn find_user<'a>(conn: &SqliteConnection, key: UserKey<'a>) -> Result<User> {
+pub fn find_user(conn: &SqliteConnection, key: UserKey) -> Result<User> {
   match key {
     UserKey::Username(name) => users::table
       .filter(users::username.eq(name))
@@ -105,7 +111,7 @@ pub fn publish_post(conn: &SqliteConnection, user_id: i32) -> Result<Post> {
 
 pub fn fetch_all_posts(
   conn: &SqliteConnection,
-) -> Result<Vec<((Post, User), Vec<(Comment, User)>)>> {
+) -> Result<Vec<(PostWithAuthor, CommentsWithUsers)>> {
   let query = posts::table
     .order(posts::id.desc())
     .filter(posts::published.eq(true))
@@ -129,7 +135,7 @@ pub fn fetch_all_posts(
 pub fn fetch_user_posts(
   conn: &SqliteConnection,
   user_id: i32,
-) -> Result<Vec<(Post, Vec<(Comment, User)>)>> {
+) -> Result<Vec<(Post, Vec<CommentWithUser>)>> {
   let posts = posts::table
     .filter(posts::user_id.eq(user_id))
     .order(posts::id.desc())

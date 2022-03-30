@@ -1,7 +1,21 @@
 curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/users -d '{"username":"Frank"}'
+curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/users/1/posts -d '{"title":"Frank says hello","body":"Hello friends"}' | json_pp
 
 curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/users -d '{"username":"Bob"}'
+curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/users/2/posts -d '{"title":"Bob is here too","body":"Hello friends, also"}' | json_pp
 
-curl -s -H 'Content-Type: application/json' -X GET http://localhost:8998/users/find/Frank
+curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/posts/1/publish | json_pp
 
-curl -s -H 'Content-Type: application/json' -X GET http://localhost:8998/users/1
+curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/posts/1/comments -d '{"user_id":2,"body":"Hi Frank, this is your friend Bob"}' | json_pp
+
+curl -s -H 'Content-Type: application/json' http://localhost:8998/posts | json_pp
+
+curl -s -H 'Content-Type: application/json' http://localhost:8998/users/1/posts | json_pp
+
+curl -s -H 'Content-Type: application/json' -X POST http://localhost:8998/posts/2/publish | json_pp
+
+curl -s -H 'Content-Type: application/json' http://localhost:8998/posts | json_pp
+
+curl -s -H 'Content-Type: application/json' http://localhost:8998/users/2/comments | json_pp
+
+curl -s -H 'Content-Type: application/json' http://localhost:8998/posts/1/comments | json_pp
